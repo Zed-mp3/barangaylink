@@ -1,0 +1,17 @@
+RewriteEngine On
+
+Options -Indexes
+
+<FilesMatch "\.(sql|log|ini)$">
+    Require all denied
+</FilesMatch>
+
+<FilesMatch "(config.php|database.php)">
+    Require all denied
+</FilesMatch>
+
+RewriteRule ^includes/ - [F,L]
+RewriteRule ^database/ - [F,L]
+
+ErrorDocument 404 /public/404.php
+ErrorDocument 403 /public/403.php

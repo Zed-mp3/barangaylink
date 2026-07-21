@@ -1,0 +1,12 @@
+# Firebase Admin SDK
+secure/*.json
+
+# Environment files
+.env
+
+# Composer dependencies (optional)
+# vendor/
+
+# XAMPP/IDE
+.vscode/
+.idea/
