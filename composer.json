@@ -1,0 +1,12 @@
+{
+    "name": "johnzedrick/barangaylink",
+    "authors": [
+        {
+            "name": "Zed-mp3",
+            "email": "zedmacasiray@gmail.com"
+        }
+    ],
+    "require": {
+        "kreait/firebase-php": "^7.24.1"
+    }
+}

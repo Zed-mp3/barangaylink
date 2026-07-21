@@ -34,24 +34,22 @@ namespace Google\ApiCore;
 use DomainException;
 use Exception;
 use Google\Auth\ApplicationDefaultCredentials;
-use Google\Auth\ProjectIdProviderInterface;
 use Google\Auth\Cache\MemoryCacheItemPool;
+use Google\Auth\Credentials\GCECredentials;
 use Google\Auth\Credentials\ServiceAccountCredentials;
 use Google\Auth\CredentialsLoader;
 use Google\Auth\FetchAuthTokenCache;
 use Google\Auth\FetchAuthTokenInterface;
 use Google\Auth\GetQuotaProjectInterface;
 use Google\Auth\GetUniverseDomainInterface;
-use Google\Auth\HttpHandler\Guzzle6HttpHandler;
-use Google\Auth\HttpHandler\Guzzle7HttpHandler;
-use Google\Auth\HttpHandler\HttpHandlerFactory;
+use Google\Auth\ProjectIdProviderInterface;
 use Google\Auth\UpdateMetadataInterface;
 use Psr\Cache\CacheItemPoolInterface;
 
 /**
  * The CredentialsWrapper object provides a wrapper around a FetchAuthTokenInterface.
  */
-class CredentialsWrapper implements ProjectIdProviderInterface
+class CredentialsWrapper implements HeaderCredentialsInterface, ProjectIdProviderInterface
 {
     use ValidationTrait;
 
@@ -60,7 +58,6 @@ class CredentialsWrapper implements ProjectIdProviderInterface
     /** @var callable $authHttpHandle */
     private $authHttpHandler;
 
-    private string $universeDomain;
     private bool $hasCheckedUniverse = false;
 
     /** @var int */
@@ -78,14 +75,13 @@ class CredentialsWrapper implements ProjectIdProviderInterface
     public function __construct(
         FetchAuthTokenInterface $credentialsFetcher,
         ?callable $authHttpHandler = null,
-        string $universeDomain = GetUniverseDomainInterface::DEFAULT_UNIVERSE_DOMAIN
+        private string $universeDomain = GetUniverseDomainInterface::DEFAULT_UNIVERSE_DOMAIN,
     ) {
         $this->credentialsFetcher = $credentialsFetcher;
-        $this->authHttpHandler = $authHttpHandler ?: self::buildHttpHandlerFactory();
+        $this->authHttpHandler = $authHttpHandler;
         if (empty($universeDomain)) {
             throw new ValidationException('The universe domain cannot be empty');
         }
-        $this->universeDomain = $universeDomain;
     }
 
     /**
@@ -118,6 +114,9 @@ class CredentialsWrapper implements ProjectIdProviderInterface
      *     @type bool $useJwtAccessWithScope
      *           Ensures service account credentials use JWT Access (also known as self-signed
      *           JWTs), even when user-defined scopes are supplied.
+     *     @type bool $enableRegionalAccessBoundary
+     *           Enable the Regional Access Boundary lookup in the credentials which sets the
+     *           `x-allowed-locations` header in the request.
      * }
      * @param string $universeDomain The expected universe of the credentials. Defaults to
      *                               "googleapis.com"
@@ -138,19 +137,20 @@ class CredentialsWrapper implements ProjectIdProviderInterface
             'quotaProject'      => null,
             'defaultScopes'     => null,
             'useJwtAccessWithScope' => true,
+            'enableRegionalAccessBoundary' => false,
         ];
 
         $keyFile = $args['keyFile'];
-        $authHttpHandler = $args['authHttpHandler'] ?: self::buildHttpHandlerFactory();
 
         if (is_null($keyFile)) {
             $loader = self::buildApplicationDefaultCredentials(
                 $args['scopes'],
-                $authHttpHandler,
+                $args['authHttpHandler'],
                 $args['authCacheOptions'],
                 $args['authCache'],
                 $args['quotaProject'],
-                $args['defaultScopes']
+                $args['defaultScopes'],
+                $args['enableRegionalAccessBoundary'],
             );
             if ($loader instanceof FetchAuthTokenCache) {
                 $loader = $loader->getFetcher();
@@ -170,7 +170,8 @@ class CredentialsWrapper implements ProjectIdProviderInterface
             $loader = CredentialsLoader::makeCredentials(
                 $args['scopes'],
                 $keyFile,
-                $args['defaultScopes']
+                $args['defaultScopes'],
+                $args['enableRegionalAccessBoundary'],
             );
         }
 
@@ -189,13 +190,13 @@ class CredentialsWrapper implements ProjectIdProviderInterface
             );
         }
 
-        return new CredentialsWrapper($loader, $authHttpHandler, $universeDomain);
+        return new CredentialsWrapper($loader, $args['authHttpHandler'], $universeDomain);
     }
 
     /**
      * @return string|null The quota project associated with the credentials.
      */
-    public function getQuotaProject()
+    public function getQuotaProject(): ?string
     {
         if ($this->credentialsFetcher instanceof GetQuotaProjectInterface) {
             return $this->credentialsFetcher->getQuotaProject();
@@ -239,7 +240,7 @@ class CredentialsWrapper implements ProjectIdProviderInterface
      * @param string $audience optional audience for self-signed JWTs.
      * @return callable Callable function that returns an authorization header.
      */
-    public function getAuthorizationHeaderCallback($audience = null)
+    public function getAuthorizationHeaderCallback($audience = null): ?callable
     {
         // NOTE: changes to this function should be treated carefully and tested thoroughly. It will
         // be passed into the gRPC c extension, and changes have the potential to trigger very
@@ -251,7 +252,7 @@ class CredentialsWrapper implements ProjectIdProviderInterface
 
                 // Call updateMetadata to take advantage of self-signed JWTs
                 if ($this->credentialsFetcher instanceof UpdateMetadataInterface) {
-                    return $this->credentialsFetcher->updateMetadata([], $audience);
+                    return $this->credentialsFetcher->updateMetadata([], $audience, $this->authHttpHandler);
                 }
 
                 // In case a custom fetcher is provided (unlikely) which doesn't
@@ -271,10 +272,12 @@ class CredentialsWrapper implements ProjectIdProviderInterface
 
     /**
      * Verify that the expected universe domain matches the universe domain from the credentials.
+     *
+     * @throws ValidationException if the universe domain does not match.
      */
-    public function checkUniverseDomain()
+    public function checkUniverseDomain(): void
     {
-        if (false === $this->hasCheckedUniverse) {
+        if (false === $this->hasCheckedUniverse && $this->shouldCheckUniverseDomain()) {
             $credentialsUniverse = $this->credentialsFetcher instanceof GetUniverseDomainInterface
                 ? $this->credentialsFetcher->getUniverseDomain()
                 : GetUniverseDomainInterface::DEFAULT_UNIVERSE_DOMAIN;
@@ -290,16 +293,21 @@ class CredentialsWrapper implements ProjectIdProviderInterface
     }
 
     /**
-     * @return Guzzle6HttpHandler|Guzzle7HttpHandler
-     * @throws ValidationException
+     * Skip universe domain check for Metadata server (e.g. GCE) credentials.
+     *
+     * @return bool
      */
-    private static function buildHttpHandlerFactory()
+    private function shouldCheckUniverseDomain(): bool
     {
-        try {
-            return HttpHandlerFactory::build();
-        } catch (Exception $ex) {
-            throw new ValidationException("Failed to build HttpHandler", $ex->getCode(), $ex);
+        $fetcher = $this->credentialsFetcher instanceof FetchAuthTokenCache
+            ? $this->credentialsFetcher->getFetcher()
+            : $this->credentialsFetcher;
+
+        if ($fetcher instanceof GCECredentials) {
+            return false;
         }
+
+        return true;
     }
 
     /**
@@ -318,7 +326,8 @@ class CredentialsWrapper implements ProjectIdProviderInterface
         ?array $authCacheOptions = null,
         ?CacheItemPoolInterface $authCache = null,
         $quotaProject = null,
-        ?array $defaultScopes = null
+        ?array $defaultScopes = null,
+        bool $enableRegionalAccessBoundary = true,
     ) {
         try {
             return ApplicationDefaultCredentials::getCredentials(
@@ -327,10 +336,13 @@ class CredentialsWrapper implements ProjectIdProviderInterface
                 $authCacheOptions,
                 $authCache,
                 $quotaProject,
-                $defaultScopes
+                $defaultScopes,
+                null, // $universeDomain
+                null, // $logger
+                $enableRegionalAccessBoundary,
             );
         } catch (DomainException $ex) {
-            throw new ValidationException("Could not construct ApplicationDefaultCredentials", $ex->getCode(), $ex);
+            throw new ValidationException('Could not construct ApplicationDefaultCredentials', $ex->getCode(), $ex);
         }
     }
 
