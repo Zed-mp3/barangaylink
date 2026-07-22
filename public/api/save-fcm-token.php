@@ -1,7 +1,6 @@
 <?php
-// TEMP: surface real errors while debugging — remove display_errors in production
 error_reporting(E_ALL);
-ini_set('display_errors', 1);
+ini_set('display_errors', 0); // off in production — errors still logged server-side
 
 require_once '../../includes/config.php';
 require_once '../../includes/database.php';
@@ -36,11 +35,21 @@ $user_id = (int)$data['user_id'];
 $fcm_token = $db->escape($data['fcm_token']);
 $device_type = $db->escape($data['device_type'] ?? 'android');
 
-$result = $db->query("
-    INSERT INTO user_devices (user_id, fcm_token, device_type)
-    VALUES ($user_id, '$fcm_token', '$device_type')
-    ON DUPLICATE KEY UPDATE last_active = NOW()
-");
+try {
+    $result = $db->query("
+        INSERT INTO user_devices (user_id, fcm_token, device_type, last_active)
+        VALUES ($user_id, '$fcm_token', '$device_type', NOW())
+        ON DUPLICATE KEY UPDATE last_active = NOW()
+    ");
+} catch (mysqli_sql_exception $e) {
+    error_log('save-fcm-token.php DB error: ' . $e->getMessage());
+    http_response_code(500);
+    echo json_encode([
+        "success" => false,
+        "error" => "Database insert failed"
+    ]);
+    exit;
+}
 
 if ($result === false) {
     http_response_code(500);
