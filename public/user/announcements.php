@@ -19,10 +19,6 @@ $latest_sql = "SELECT MAX(UNIX_TIMESTAMP(created_at)) as latest FROM announcemen
 $latest_result = $db->query($latest_sql);
 $latest_row = $latest_result->fetch_assoc();
 $initial_last_update = $latest_row['latest'] ? (int)$latest_row['latest'] : time();
-
-// Pass user data to JavaScript for notifications
-$user_id = $user['id'];
-$user_name = $user['full_name'];
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -32,154 +28,221 @@ $user_name = $user['full_name'];
     <title>Announcements - BarangayLink</title>
     <link rel="stylesheet" href="../../src/css/main.css?v=<?php echo time(); ?>">
     <style>
-        /* New styles for polling system */
+        .notification-badge {
+            background: var(--danger-color);
+            color: white;
+            border-radius: 50%;
+            padding: 2px 6px;
+            font-size: 0.75rem;
+            margin-left: 5px;
+        }
+        
+        /* Pull to refresh indicator */
+        .ptr-container {
+            position: relative;
+            overflow: hidden;
+            height: 0;
+            transition: height 0.3s;
+            text-align: center;
+            background: var(--light-bg);
+            border-radius: 8px 8px 0 0;
+            margin-top: -10px;
+        }
+        
+        .ptr-container.show {
+            height: 50px;
+        }
+        
+        .ptr-content {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            padding: 10px;
+            color: var(--primary-color);
+            font-weight: 500;
+        }
+        
+        .ptr-spinner {
+            width: 24px;
+            height: 24px;
+            border: 3px solid var(--light-bg);
+            border-top: 3px solid var(--secondary-color);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        .last-checked {
+            font-size: 0.8rem;
+            color: #666;
+            text-align: right;
+            margin: 5px 15px 10px;
+            padding: 5px;
+            background: var(--white);
+            border-radius: 4px;
+            box-shadow: var(--shadow);
+        }
+        
+        .announcements-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+            gap: 10px;
+            padding: 0 5px;
+        }
+        
+        .announcements-header h1 {
+            margin: 0;
+            font-size: 1.5rem;
+        }
+        
         .new-badge {
-            display: inline-block;
-            background: #ff6b6b;
+            background: var(--success-color);
             color: white;
             padding: 4px 12px;
             border-radius: 20px;
-            font-size: 12px;
-            font-weight: 600;
+            font-size: 0.8rem;
+            font-weight: bold;
             cursor: pointer;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
             transition: all 0.3s ease;
-            animation: pulse 1.5s ease-in-out infinite;
+            white-space: nowrap;
         }
+        
         .new-badge:hover {
             transform: scale(1.05);
-            background: #ee5a24;
+            background: var(--secondary-color);
         }
-        @keyframes pulse {
-            0%, 100% { transform: scale(1); }
-            50% { transform: scale(1.05); }
+        
+        .new-badge.pulse {
+            animation: pulse 1.5s infinite;
         }
-        .click-hint {
-            font-size: 12px;
+        
+        .refresh-indicator {
+            font-size: 0.8rem;
             color: #666;
-            margin: 5px 0 10px 0;
-            font-style: italic;
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 5px;
+            padding: 5px 10px;
+            background: var(--white);
+            border-radius: 20px;
+            box-shadow: var(--shadow);
+            margin: 5px 0 10px;
         }
-        .announcement-item.highlight-new {
-            animation: highlightFlash 2s ease;
-            border-left: 4px solid #1a73e8;
-            background: #f0f7ff;
-        }
-        @keyframes highlightFlash {
-            0% { background: #e3f2fd; }
-            100% { background: transparent; }
-        }
-        .live-indicator {
-            display: inline-block;
-            width: 10px;
-            height: 10px;
-            background: #4caf50;
-            border-radius: 50%;
-            margin-left: 8px;
-            animation: livePulse 2s infinite;
-        }
-        @keyframes livePulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.3; }
-        }
-        .refresh-indicator.checking .spinner-small {
-            display: inline-block;
-            animation: spin 1s linear infinite;
-        }
-        .spinner-small {
-            display: none;
+        
+        .refresh-indicator .spinner-small {
             width: 16px;
             height: 16px;
-            border: 2px solid #f3f3f3;
-            border-top: 2px solid #3498db;
+            border: 2px solid var(--light-bg);
+            border-top: 2px solid var(--secondary-color);
             border-radius: 50%;
-            margin-left: 10px;
+            animation: spin 1s linear infinite;
+            display: none;
         }
+        
+        .refresh-indicator.checking .spinner-small {
+            display: inline-block;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 30px;
+            display: none;
+        }
+        
+        .loading.active {
+            display: block;
+        }
+        
+        .loading .spinner {
+            margin: 0 auto 15px;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.8; transform: scale(1.1); }
+            100% { opacity: 1; transform: scale(1); }
+        }
+        
         @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
-        .loading.active .spinner {
-            display: inline-block;
-            width: 30px;
-            height: 30px;
-            border: 3px solid #f3f3f3;
-            border-top: 3px solid #3498db;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-            margin-right: 10px;
+        
+        /* Mobile optimizations */
+        @media (max-width: 768px) {
+            .announcements-header h1 {
+                font-size: 1.3rem;
+            }
+            
+            .last-checked {
+                margin: 5px 10px 10px;
+                font-size: 0.75rem;
+            }
+            
+            .announcement-item {
+                padding: 15px;
+                margin-bottom: 12px;
+            }
+            
+            .announcement-title {
+                font-size: 1.1rem;
+            }
+            
+            .announcement-meta {
+                font-size: 0.8rem;
+                flex-direction: column;
+                gap: 3px;
+            }
+            
+            .new-badge {
+                padding: 4px 10px;
+                font-size: 0.75rem;
+            }
         }
-        .loading {
+        
+        /* Swipe hint for mobile */
+        .swipe-hint {
             display: none;
-            padding: 20px;
             text-align: center;
             color: #666;
-        }
-        .loading.active {
-            display: block;
-        }
-        .swipe-hint {
-            text-align: center;
-            color: #999;
-            font-size: 12px;
+            font-size: 0.75rem;
             padding: 5px;
+            margin-bottom: 5px;
+            opacity: 0.7;
         }
-        .alert-danger {
-            background: #f8d7da;
-            color: #721c24;
-            padding: 15px;
-            border-radius: 4px;
-            border: 1px solid #f5c6cb;
-        }
-        .announcements-header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            flex-wrap: wrap;
-        }
-        .announcements-header h1 {
-            display: flex;
-            align-items: center;
-        }
-        .toast-notification {
-            position: fixed;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            padding: 12px 24px;
-            border-radius: 8px;
-            z-index: 9999;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-            font-size: 14px;
-            max-width: 90%;
-            animation: fadeInUp 0.3s ease;
-            color: white;
-        }
-        .toast-notification.success {
-            background: #28a745;
-        }
-        .toast-notification.error {
-            background: #dc3545;
-        }
-        .toast-notification.info {
-            background: #17a2b8;
-        }
-        @keyframes fadeInUp {
-            from {
-                opacity: 0;
-                transform: translateX(-50%) translateY(20px);
+        
+        @media (max-width: 768px) {
+            .swipe-hint {
+                display: block;
             }
-            to {
-                opacity: 1;
-                transform: translateX(-50%) translateY(0);
-            }
+        }
+        
+        /* Empty state */
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: #666;
+        }
+        
+        .empty-state p {
+            margin: 10px 0;
+        }
+        
+        /* Subtle hint that badge is clickable */
+        .click-hint {
+            font-size: 0.7rem;
+            color: #666;
+            text-align: center;
+            margin-top: -10px;
+            margin-bottom: 10px;
+            opacity: 0.6;
         }
     </style>
-    <script>
-    // Pass user data to JavaScript
-    window.currentUserId = <?php echo $user_id; ?>;
-    window.currentUserName = '<?php echo addslashes($user_name); ?>';
-    window.initialLastUpdate = <?php echo $initial_last_update; ?>;
-    </script>
 </head>
 <body>
    <!-- Side Navigation -->
@@ -273,7 +336,7 @@ $user_name = $user['full_name'];
             </div>
             
             <div class="announcements-header">
-                <h1>Barangay Announcements <span class="live-indicator"></span></h1>
+                <h1>Barangay Announcements</h1>
                 <span id="newCount" class="new-badge" style="display: none;" onclick="refreshAnnouncements()">✨ 0 new</span>
             </div>
             
@@ -310,370 +373,242 @@ $user_name = $user['full_name'];
     </div>
     
     <script>
-    (function() {
-        'use strict';
-
-        // ============================================
-        // Configuration
-        // ============================================
-        let lastUpdate = window.initialLastUpdate || Math.floor(Date.now() / 1000);
-        let isRefreshing = false;
-        let pollInterval = null;
-        let isPolling = false;
-        let notificationSound = null;
-        let lastNotificationId = 0;
-        let notificationService = null;
-
-        // ============================================
-        // Push Notification Service (Web)
-        // ============================================
-        
-        // Load push notification service
-        function loadPushNotificationService() {
-            const script = document.createElement('script');
-            script.src = '../../src/js/push-notification-service.js';
-            script.type = 'module';
-            script.onload = function() {
-                console.log('✅ Push notification service loaded');
-            };
-            script.onerror = function() {
-                console.log('⚠️ Push notification service not available');
-            };
-            document.head.appendChild(script);
-        }
-
-        // Initialize native notifications (Capacitor)
-        async function initNativeNotifications() {
-            if (window.Capacitor && window.Capacitor.isNative) {
-                try {
-                    const module = await import('../../src/js/notification-service.js');
-                    notificationService = module.default;
-                    await notificationService.initialize();
-                    console.log('📱 Native notifications ready');
-                } catch (error) {
-                    console.log('⚠️ Native notifications not available', error);
-                }
-            }
-        }
-
-        // Check for native notifications
-        async function checkForNotifications() {
-            if (!window.Capacitor || !window.Capacitor.isNative || !notificationService) return;
+    // Initialize notification system if not exists
+    window.BarangayLink = window.BarangayLink || {
+        showNotification: function(message, type) {
+            console.log(message, type);
+            // Use a more mobile-friendly notification
+            if (navigator.vibrate) navigator.vibrate(50);
             
-            try {
-                const response = await fetch('/public/api/notifications.php?action=check&lastId=' + lastNotificationId);
-                const data = await response.json();
-                
-                if (data.notifications && data.notifications.length > 0) {
-                    for (const notification of data.notifications) {
-                        if (notification.type === 'announcement') {
-                            await notificationService.sendAnnouncementNotification(notification.data);
-                        }
-                        
-                        lastNotificationId = Math.max(lastNotificationId, notification.id);
-                        
-                        fetch('/public/api/notifications.php?action=mark_read', {
-                            method: 'POST',
-                            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-                            body: 'id=' + notification.id
-                        });
-                    }
-                }
-            } catch (error) {
-                console.error('Error checking notifications:', error);
-            }
-        }
-
-        // ============================================
-        // Core Functions
-        // ============================================
-        
-        // Refresh announcements from server
-        window.refreshAnnouncements = function() {
-            if (isRefreshing) return;
-            isRefreshing = true;
-            
-            const loading = document.getElementById('loading');
-            const container = document.getElementById('announcements-container');
-            const indicator = document.getElementById('refreshIndicator');
-            const badge = document.getElementById('newCount');
-            
-            if (loading) loading.classList.add('active');
-            if (indicator) indicator.classList.add('checking');
-            
-            if (badge) {
-                badge.style.display = 'none';
-            }
-            const hint = document.getElementById('clickHint');
-            if (hint) hint.style.display = 'none';
-            
-            fetch('get_announcements.php?_=' + Date.now())
-                .then(response => {
-                    if (!response.ok) throw new Error('Network error');
-                    return response.text();
-                })
-                .then(html => {
-                    if (container) container.innerHTML = html;
-                    const updated = document.getElementById('last-updated');
-                    if (updated) updated.textContent = new Date().toLocaleTimeString();
-                    
-                    // Update timestamp from hidden input if exists
-                    const tsInput = document.getElementById('last-updated-timestamp');
-                    if (tsInput) {
-                        lastUpdate = parseInt(tsInput.value) || Math.floor(Date.now() / 1000);
-                    } else {
-                        lastUpdate = Math.floor(Date.now() / 1000);
-                    }
-                    
-                    highlightNewItems();
-                    showToast('Announcements updated', 'success');
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    if (container) {
-                        container.innerHTML = '<div class="alert alert-danger">Error loading announcements. Please try again.</div>';
-                    }
-                    showToast('Failed to load announcements', 'error');
-                })
-                .finally(() => {
-                    if (loading) loading.classList.remove('active');
-                    if (indicator) indicator.classList.remove('checking');
-                    isRefreshing = false;
-                    
-                    const ptr = document.querySelector('.ptr-container');
-                    if (ptr) ptr.classList.remove('refreshing');
-                });
-        };
-
-        // Check for updates via AJAX polling
-        function checkForUpdates() {
-            if (isRefreshing) return;
-            
-            fetch('check_announcements_updates.php?last=' + lastUpdate + '&_=' + Date.now())
-                .then(response => {
-                    if (!response.ok) throw new Error('Network error');
-                    return response.json();
-                })
-                .then(data => {
-                    if (data.success && data.hasUpdates && data.count > 0) {
-                        console.log('📢 Found', data.count, 'new announcement(s)');
-                        
-                        if (data.lastUpdate > lastUpdate) {
-                            lastUpdate = data.lastUpdate;
-                        }
-                        
-                        // Show badge
-                        showNewCountBadge(data.count);
-                        
-                        // Play notification sound
-                        playNotificationSound();
-                        
-                        // Show browser notification
-                        if (data.announcements && data.announcements.length > 0) {
-                            data.announcements.forEach(function(ann) {
-                                // Send web push notification
-                                sendPushNotification(ann);
-                                
-                                // Send native notification if available
-                                if (notificationService) {
-                                    notificationService.sendAnnouncementNotification({
-                                        title: ann.title,
-                                        body: ann.content || ann.message || '',
-                                        id: ann.id
-                                    });
-                                }
-                                
-                                // Show browser notification
-                                showBrowserNotification('📢 New Announcement', ann.title);
-                            });
-                        }
-                        
-                        // Auto-refresh after 2 seconds
-                        setTimeout(function() {
-                            window.refreshAnnouncements();
-                        }, 2000);
-                    }
-                })
-                .catch(err => {
-                    // Silent fail for polling
-                    console.debug('Polling check failed:', err);
-                });
-        }
-
-        // ============================================
-        // Push Notification Functions
-        // ============================================
-        
-        // Send push notification (web)
-        function sendPushNotification(announcement) {
-            // Check if service worker is registered
-            if ('serviceWorker' in navigator && 'PushManager' in window) {
-                // The push-notification-service.js handles this automatically
-                // We just need to trigger the notification
-                if (window.BarangayLink && window.BarangayLink.showNotification) {
-                    window.BarangayLink.showNotification('📢 ' + announcement.title, 'info');
-                }
-            }
-        }
-
-        // ============================================
-        // UI Helper Functions
-        // ============================================
-
-        function highlightNewItems() {
-            const items = document.querySelectorAll('.announcement-item');
-            items.forEach(function(item) {
-                const itemTime = parseInt(item.dataset.updated || '0');
-                if (itemTime > lastUpdate) {
-                    item.classList.add('highlight-new');
-                    setTimeout(function() {
-                        item.classList.remove('highlight-new');
-                    }, 3000);
-                }
-            });
-        }
-
-        function showToast(message, type) {
-            // Use BarangayLink notification if available
-            if (window.BarangayLink && window.BarangayLink.showNotification) {
-                window.BarangayLink.showNotification(message, type);
-                return;
-            }
-            
-            // Fallback toast
+            // Create a toast notification
             const toast = document.createElement('div');
-            toast.className = 'toast-notification ' + (type || 'info');
+            toast.style.cssText = `
+                position: fixed;
+                bottom: 20px;
+                left: 50%;
+                transform: translateX(-50%);
+                background: ${type === 'error' ? 'var(--danger-color)' : type === 'success' ? 'var(--success-color)' : 'var(--info-color)'};
+                color: white;
+                padding: 12px 20px;
+                border-radius: 30px;
+                box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+                z-index: 9999;
+                font-size: 0.9rem;
+                max-width: 90%;
+                text-align: center;
+                animation: slideUp 0.3s ease;
+            `;
             toast.textContent = message;
             document.body.appendChild(toast);
             
-            setTimeout(function() {
-                toast.style.opacity = '0';
-                toast.style.transition = 'opacity 0.3s ease';
-                setTimeout(function() {
-                    toast.remove();
-                }, 300);
-            }, 3000);
+            setTimeout(() => {
+                toast.style.animation = 'fadeOut 0.3s ease';
+                setTimeout(() => toast.remove(), 300);
+            }, 2000); // Shorter duration
         }
-
-        function showNewCountBadge(count) {
-            const badge = document.getElementById('newCount');
-            const hint = document.getElementById('clickHint');
-            
-            if (badge) {
-                badge.textContent = '✨ ' + count + ' new';
-                badge.style.display = 'inline-block';
+    };
+    
+    let lastUpdate = <?php echo $initial_last_update; ?>;
+    let refreshInterval;
+    let isRefreshing = false;
+    let checkInterval = 15000; // 15 seconds
+    let touchStartY = 0;
+    let touchMoveY = 0;
+    let pulling = false;
+    let newCount = 0;
+    
+    // Load announcements on page load
+    document.addEventListener('DOMContentLoaded', function() {
+        loadAnnouncements();
+        startAutoRefresh();
+        initPullToRefresh();
+    });
+    
+    function initPullToRefresh() {
+        const container = document.querySelector('.main-content .container');
+        const ptrContainer = document.getElementById('ptrContainer');
+        const ptrText = document.getElementById('ptrText');
+        
+        container.addEventListener('touchstart', function(e) {
+            if (window.scrollY === 0) {
+                touchStartY = e.touches[0].clientY;
+                pulling = true;
             }
+        }, { passive: true });
+        
+        container.addEventListener('touchmove', function(e) {
+            if (!pulling || window.scrollY > 0) return;
             
-            if (hint && hint.style.display !== 'block') {
-                hint.style.display = 'block';
-                clearTimeout(window.hintTimeout);
-                window.hintTimeout = setTimeout(function() {
-                    if (hint) hint.style.display = 'none';
-                }, 5000);
-            }
-        }
-
-        function showBrowserNotification(title, body) {
-            if ('Notification' in window && Notification.permission === 'granted') {
-                try {
-                    new Notification(title, {
-                        body: body || 'New announcement available',
-                        icon: '/assets/1772429077726-removebg-preview.png'
-                    });
-                } catch (e) {
-                    // Ignore
+            touchMoveY = e.touches[0].clientY;
+            const pullDistance = touchMoveY - touchStartY;
+            
+            if (pullDistance > 0 && pullDistance < 150) {
+                ptrContainer.style.height = Math.min(pullDistance, 50) + 'px';
+                
+                if (pullDistance > 70) {
+                    ptrText.textContent = 'Release to refresh';
+                } else {
+                    ptrText.textContent = 'Pull to refresh';
                 }
             }
-        }
-
-        function playNotificationSound() {
-            try {
-                if (!notificationSound) {
-                    notificationSound = new Audio('/assets/notification.mp3');
-                }
-                notificationSound.play().catch(function() {
-                    // Audio play failed, ignore
-                });
-            } catch (e) {
-                // Audio not available
+        }, { passive: true });
+        
+        container.addEventListener('touchend', function(e) {
+            if (!pulling) return;
+            
+            const pullDistance = touchMoveY - touchStartY;
+            
+            if (pullDistance > 70 && window.scrollY === 0) {
+                // Trigger refresh
+                ptrContainer.style.height = '50px';
+                ptrText.textContent = 'Refreshing...';
+                refreshAnnouncements();
+                
+                setTimeout(() => {
+                    ptrContainer.style.height = '0';
+                }, 1000);
+            } else {
+                ptrContainer.style.height = '0';
             }
+            
+            pulling = false;
+            touchStartY = 0;
+            touchMoveY = 0;
+        }, { passive: true });
+    }
+    
+    function startAutoRefresh() {
+        if (refreshInterval) {
+            clearInterval(refreshInterval);
         }
-
-        // ============================================
-        // Polling Control
-        // ============================================
-
-        function startPolling() {
-            if (isPolling) return;
-            isPolling = true;
-            
-            // Check every 10 seconds
-            pollInterval = setInterval(checkForUpdates, 10000);
-            console.log('🔄 Polling started (every 10 seconds)');
-            
-            // Also check immediately
+        refreshInterval = setInterval(checkForUpdates, checkInterval);
+    }
+    
+    function checkForUpdates() {
+        const indicator = document.getElementById('refreshIndicator');
+        indicator.classList.add('checking');
+        
+        fetch('check_announcements_updates.php?since=' + lastUpdate)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.hasUpdates) {
+                    newCount = data.count;
+                    
+                    // Update the badge
+                    const newCountBadge = document.getElementById('newCount');
+                    newCountBadge.textContent = '✨ ' + newCount + ' new';
+                    newCountBadge.style.display = 'inline-block';
+                    newCountBadge.classList.add('pulse');
+                    
+                    // Show click hint
+                    document.getElementById('clickHint').style.display = 'block';
+                    
+                    // Vibrate on mobile if supported (once)
+                    if (navigator.vibrate) navigator.vibrate(50);
+                    
+                    // Log silently
+                    console.log('New announcements available:', newCount);
+                }
+            })
+            .catch(error => console.error('Error checking updates:', error))
+            .finally(() => {
+                indicator.classList.remove('checking');
+            });
+    }
+    
+    function refreshAnnouncements() {
+        if (isRefreshing) return;
+        
+        isRefreshing = true;
+        const loading = document.getElementById('loading');
+        const container = document.getElementById('announcements-container');
+        const indicator = document.getElementById('refreshIndicator');
+        const newCountBadge = document.getElementById('newCount');
+        
+        loading.classList.add('active');
+        indicator.classList.add('checking');
+        
+        // Hide badge and hint
+        newCountBadge.style.display = 'none';
+        newCountBadge.classList.remove('pulse');
+        document.getElementById('clickHint').style.display = 'none';
+        
+        const timestamp = new Date().getTime();
+        
+        fetch('get_announcements.php?_=' + timestamp)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.text();
+            })
+            .then(data => {
+                container.innerHTML = data;
+                document.getElementById('last-updated').textContent = new Date().toLocaleTimeString();
+                
+                // Update lastUpdate timestamp from the response if available
+                const timestampInput = document.getElementById('last-updated-timestamp');
+                if (timestampInput) {
+                    lastUpdate = parseInt(timestampInput.value) || Math.floor(Date.now() / 1000);
+                } else {
+                    lastUpdate = Math.floor(Date.now() / 1000);
+                }
+                
+                newCount = 0;
+                highlightNewItems();
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                container.innerHTML = '<div class="alert alert-danger">Error loading announcements. Please try again.</div>';
+            })
+            .finally(() => {
+                loading.classList.remove('active');
+                indicator.classList.remove('checking');
+                isRefreshing = false;
+            });
+    }
+    
+    function highlightNewItems() {
+        const items = document.querySelectorAll('.announcement-item');
+        items.forEach(item => {
+            const itemTime = parseInt(item.dataset.updated || '0');
+            if (itemTime > lastUpdate) {
+                item.classList.add('highlight');
+                setTimeout(() => {
+                    item.classList.remove('highlight');
+                }, 2000);
+            }
+        });
+    }
+    
+    function loadAnnouncements() {
+        refreshAnnouncements();
+    }
+    
+    // Check for updates when tab becomes visible again
+    document.addEventListener('visibilitychange', function() {
+        if (!document.hidden) {
             checkForUpdates();
         }
-
-        function stopPolling() {
-            isPolling = false;
-            if (pollInterval) {
-                clearInterval(pollInterval);
-                pollInterval = null;
-                console.log('⏹️ Polling stopped');
-            }
+    });
+    
+    // Clean up interval on page unload
+    window.addEventListener('beforeunload', function() {
+        if (refreshInterval) {
+            clearInterval(refreshInterval);
         }
-
-        // ============================================
-        // Initialize
-        // ============================================
-
-        document.addEventListener('DOMContentLoaded', function() {
-            console.log('📢 Announcements page loaded');
-            
-            // Load push notification service
-            loadPushNotificationService();
-            
-            // Initialize native notifications (Capacitor)
-            initNativeNotifications();
-            
-            // Load initial announcements
-            window.refreshAnnouncements();
-            
-            // Start polling for updates
-            setTimeout(startPolling, 1000);
-            
-            // Request notification permission
-            if ('Notification' in window && Notification.permission === 'default') {
-                Notification.requestPermission().then(function(permission) {
-                    console.log('🔔 Notification permission:', permission);
-                });
-            }
-            
-            // Handle visibility change - check when tab becomes active
-            document.addEventListener('visibilitychange', function() {
-                if (!document.hidden) {
-                    console.log('👁️ Tab became active, checking for updates');
-                    checkForUpdates();
-                }
-            });
-            
-            // Clean up on page unload
-            window.addEventListener('beforeunload', function() {
-                stopPolling();
-            });
-        });
-
-        // Expose functions globally
-        window.startPolling = startPolling;
-        window.stopPolling = stopPolling;
-        window.checkForUpdates = checkForUpdates;
-
-    })();
+    });
+    
+    // Add touch feedback
+    document.addEventListener('touchstart', function() {}, { passive: true });
     </script>
     
     <script src="../../src/js/main.js"></script>
     <script src="../../src/js/mobile-menu.js"></script>
-    <script src="../../src/js/pull-to-refresh.js"></script>
 </body>
 </html>
