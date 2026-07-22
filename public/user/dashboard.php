@@ -336,7 +336,7 @@ $user_name = $user['full_name'];
             </div>
         </div>
     </div>
-    <script src="/public/push.js"></script>
+   
     <script src="../../src/js/user-dashboard.js"></script>
     <script src="../../src/js/main.js"></script>
     <script src="../../src/js/mobile-menu.js"></script>
