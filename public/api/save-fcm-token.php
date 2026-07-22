@@ -1,4 +1,7 @@
 <?php
+// TEMP: surface real errors while debugging — remove display_errors in production
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
 
 require_once '../../includes/config.php';
 require_once '../../includes/database.php';
@@ -43,8 +46,7 @@ if ($result === false) {
     http_response_code(500);
     echo json_encode([
         "success" => false,
-        "error" => "Database insert failed",
-        
+        "error" => "Database insert failed"
     ]);
     exit;
 }
