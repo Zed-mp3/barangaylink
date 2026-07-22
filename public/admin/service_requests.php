@@ -97,7 +97,7 @@ if ($status == 'rejected' && !empty($reason)) {
                                 VALUES (
                                     $resident_id, 
                                     'request_update', 
-                                    $title, 
+                                    '" . $db->escape($title) . "', 
                                     '" . $db->escape($message) . "', 
                                     '" . $db->escape($notification_data) . "', 
                                     NOW()
