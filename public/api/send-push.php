@@ -12,7 +12,7 @@ $db = new Database();
 $title = $_POST['title'];
 $message = $_POST['message'];
 
-$serviceAccount = '../../secure/barangaylink-c5e86-firebase-adminsdk-fbsvc-faac69ae05';
+$serviceAccount = '../../secure/barangaylink-c5e86-firebase-adminsdk-fbsvc-faac69ae05.json';
 
 $factory = (new Factory)->withServiceAccount($serviceAccount);
 $messaging = $factory->createMessaging();
