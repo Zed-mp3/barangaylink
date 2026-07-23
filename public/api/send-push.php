@@ -22,14 +22,12 @@ if (empty($message)) {
     exit;
 }
 
-// Same file, same logic as functions.php — Render Secret File first,
-// falls back to local secure/ folder for local/XAMPP development.
-$secretPath = '/etc/secrets/' . FIREBASE_SERVICE_ACCOUNT_FILENAME;
-$localPath = '../../secure/' . FIREBASE_SERVICE_ACCOUNT_FILENAME;
-$serviceAccount = file_exists($secretPath) ? $secretPath : $localPath;
+// Same resolution logic as functions.php — env var first (Render), falls
+// back to local secure/ folder for local/XAMPP development.
+$serviceAccount = getFirebaseServiceAccount();
 
-if (!file_exists($serviceAccount)) {
-    echo json_encode(['error' => 'Service account file not found: ' . $serviceAccount]);
+if ($serviceAccount === null) {
+    echo json_encode(['error' => 'Firebase service account not available (no env var or local file)']);
     exit;
 }
 
