@@ -45,14 +45,28 @@ function timeAgo($timestamp) {
 |--------------------------------------------------------------------------
 */
 
+// TODO: replace with your actual filename from Firebase Console
+define('FIREBASE_SERVICE_ACCOUNT_FILENAME', 'barangaylink-c5e86-firebase-adminsdk-fbsvc-faac69ae05.json');
+
 function sendFCMNotification(array $tokens, array $notificationData, array $data = [])
 {
     if (empty($tokens)) return false;
 
     require __DIR__ . '/../vendor/autoload.php';
 
+    // Render mounts Secret Files at /etc/secrets/<filename>.
+    // Fall back to the local secure/ folder for local/XAMPP development.
+    $secretPath = '/etc/secrets/' . FIREBASE_SERVICE_ACCOUNT_FILENAME;
+    $localPath = __DIR__ . '/../secure/' . FIREBASE_SERVICE_ACCOUNT_FILENAME;
+    $serviceAccountPath = file_exists($secretPath) ? $secretPath : $localPath;
+
+    if (!file_exists($serviceAccountPath)) {
+        error_log("FCM ERROR: service account file not found at $secretPath or $localPath");
+        return false;
+    }
+
     $factory = (new \Kreait\Firebase\Factory)
-        ->withServiceAccount(__DIR__ . '/../secure/barangaylink-c5e86-firebase-adminsdk-fbsvc-006264d723.json');
+        ->withServiceAccount($serviceAccountPath);
 
     $messaging = $factory->createMessaging();
 
