@@ -45,7 +45,8 @@ function timeAgo($timestamp) {
 |--------------------------------------------------------------------------
 */
 
-// TODO: replace with your actual filename from Firebase Console
+// TODO: replace with your actual filename from Firebase Console — used only
+// as a fallback for local/XAMPP development where no env var is set.
 define('FIREBASE_SERVICE_ACCOUNT_FILENAME', 'barangaylink-c5e86-firebase-adminsdk-fbsvc-faac69ae05.json');
 
 function sendFCMNotification(array $tokens, array $notificationData, array $data = [])
@@ -54,19 +55,14 @@ function sendFCMNotification(array $tokens, array $notificationData, array $data
 
     require __DIR__ . '/../vendor/autoload.php';
 
-    // Render mounts Secret Files at /etc/secrets/<filename>.
-    // Fall back to the local secure/ folder for local/XAMPP development.
-    $secretPath = '/etc/secrets/' . FIREBASE_SERVICE_ACCOUNT_FILENAME;
-    $localPath = __DIR__ . '/../secure/' . FIREBASE_SERVICE_ACCOUNT_FILENAME;
-    $serviceAccountPath = file_exists($secretPath) ? $secretPath : $localPath;
-
-    if (!file_exists($serviceAccountPath)) {
-        error_log("FCM ERROR: service account file not found at $secretPath or $localPath");
+    $serviceAccount = getFirebaseServiceAccount();
+    if ($serviceAccount === null) {
+        error_log("FCM ERROR: no Firebase service account available (env var or local file)");
         return false;
     }
 
     $factory = (new \Kreait\Firebase\Factory)
-        ->withServiceAccount($serviceAccountPath);
+        ->withServiceAccount($serviceAccount);
 
     $messaging = $factory->createMessaging();
 
@@ -94,4 +90,36 @@ function sendFCMNotification(array $tokens, array $notificationData, array $data
     }
 
     return true;
+}
+
+/**
+ * Returns the Firebase service account as either a decoded array
+ * (from FIREBASE_SERVICE_ACCOUNT_BASE64 env var — used on Render, avoids
+ * file-permission issues with Secret Files) or a file path (local/XAMPP
+ * fallback). Returns null if neither is available.
+ *
+ * @return array|string|null
+ */
+function getFirebaseServiceAccount()
+{
+    $base64 = getenv('FIREBASE_SERVICE_ACCOUNT_BASE64');
+
+    if (!empty($base64)) {
+        $json = base64_decode($base64, true);
+        $decoded = $json !== false ? json_decode($json, true) : null;
+
+        if (is_array($decoded)) {
+            return $decoded;
+        }
+
+        error_log("FCM ERROR: FIREBASE_SERVICE_ACCOUNT_BASE64 is set but failed to decode as valid JSON");
+    }
+
+    // Local/XAMPP fallback
+    $localPath = __DIR__ . '/../secure/' . FIREBASE_SERVICE_ACCOUNT_FILENAME;
+    if (file_exists($localPath)) {
+        return $localPath;
+    }
+
+    return null;
 }
