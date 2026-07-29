@@ -41,7 +41,7 @@ $monthly_requests = $db->query("SELECT DATE_FORMAT(created_at, '%Y-%m') as month
 $chart_labels = [];
 $chart_data = [];
 
-$monthly_data = $db->query("SELECT DATE_FORMAT(created_at, '%M') as month, COUNT(*) as count FROM service_requests WHERE created_at >= DATE_SUB(NOW(), INTERVAL 6 MONTH) GROUP BY DATE_FORMAT(created_at, '%Y-%m') ORDER BY created_at ASC");
+$monthly_data = $db->query("SELECT DATE_FORMAT(created_at, '%Y-%m') as ym, DATE_FORMAT(created_at, '%M') as month, COUNT(*) as count FROM service_requests WHERE created_at >= DATE_SUB(NOW(), INTERVAL 6 MONTH) GROUP BY ym, month ORDER BY ym ASC");
 while($row = $monthly_data->fetch_assoc()) {
     $chart_labels[] = $row['month'];
     $chart_data[] = $row['count'];
