@@ -47,6 +47,15 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_status'])) {
     $status = $db->escape($_POST['status']);
     $reason = isset($_POST['reason']) ? $db->escape($_POST['reason']) : '';
     $notes = isset($_POST['notes']) ? $db->escape($_POST['notes']) : '';
+
+    // Block updates on requests that are already completed or rejected —
+    // those are final states and shouldn't be editable again.
+    $current = $db->query("SELECT status FROM service_requests WHERE id=$request_id")->fetch_assoc();
+    if ($current && in_array($current['status'], ['completed', 'rejected'])) {
+        echo "<script>sessionStorage.setItem('notification', JSON.stringify({message: 'This request is already " . $current['status'] . " and cannot be updated again.', type: 'error'}));</script>";
+        echo "<script>window.location.href = 'service_requests.php" . (isset($_GET['status']) ? '?status='.$_GET['status'] : '') . "';</script>";
+        exit();
+    }
     
     // Build update query
     $updates = ["status='$status'", "updated_at=NOW()"];
@@ -403,9 +412,14 @@ $requests = $db->query($sql);
             
             <!-- Requests List -->
             <div class="card">
-                <div class="card-header">
-                    Service Requests List
-                    <span class="badge bg-info"><?php echo $requests->num_rows; ?> total</span>
+                <div class="card-header" style="display:flex; align-items:center; justify-content:space-between;">
+                    <span>
+                        Service Requests List
+                        <span class="badge bg-info"><?php echo $requests->num_rows; ?> total</span>
+                    </span>
+                    <button onclick="refreshRequestsList()" id="refreshBtn" class="btn btn-secondary btn-sm" data-tooltip="Refresh list">
+                        🔄 Refresh
+                    </button>
                 </div>
                 <div class="card-body">
                     <?php if ($requests->num_rows > 0): ?>
@@ -440,7 +454,11 @@ $requests = $db->query($sql);
                                         </td>
                                         <td>
                                             <button onclick="toggleRequestDetails(<?php echo $row['id']; ?>)" class="btn btn-primary btn-sm" data-tooltip="View details">👁️</button>
-                                            <button onclick="toggleUpdateForm(<?php echo $row['id']; ?>)" class="btn btn-success btn-sm" data-tooltip="Update status">🔄</button>
+                                            <?php if (!in_array($row['status'], ['completed', 'rejected'])): ?>
+                                                <button onclick="toggleUpdateForm(<?php echo $row['id']; ?>)" class="btn btn-success btn-sm" data-tooltip="Update status">🔄</button>
+                                            <?php else: ?>
+                                                <button class="btn btn-secondary btn-sm" disabled data-tooltip="This request is final and cannot be updated">🔒</button>
+                                            <?php endif; ?>
                                         </td>
                                     </tr>
                                     
@@ -550,6 +568,17 @@ $requests = $db->query($sql);
         }
     });
     
+    function refreshRequestsList() {
+        const btn = document.getElementById('refreshBtn');
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = '⏳ Refreshing...';
+        }
+        // Current filters (status/search) are already in the URL query
+        // string, so a plain reload preserves them.
+        window.location.reload();
+    }
+
     function toggleRequestDetails(id) {
         const detailsRow = document.getElementById('details-' + id);
         const updateRow = document.getElementById('update-' + id);
@@ -575,7 +604,13 @@ $requests = $db->query($sql);
             document.getElementById('reason-' + id).classList.remove('show');
             document.getElementById('notes-' + id).classList.remove('show');
         } else {
-            // Form is being opened, check current status
+            // Form is being opened — default to "In Progress" since that's
+            // the most common next action after opening this form, rather
+            // than defaulting to whatever the current status already is.
+            const statusSelect = document.getElementById('status-' + id);
+            if (statusSelect) {
+                statusSelect.value = 'in_progress';
+            }
             toggleReasonField(id);
         }
     }

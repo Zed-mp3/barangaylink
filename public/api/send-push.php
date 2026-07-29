@@ -4,6 +4,7 @@ ini_set('display_errors', 1);
 
 require_once '../../includes/config.php';
 require_once '../../includes/database.php';
+require_once '../../includes/functions.php'; // for FIREBASE_SERVICE_ACCOUNT_FILENAME
 require_once '../../vendor/autoload.php';
 
 use Kreait\Firebase\Factory;
@@ -21,12 +22,12 @@ if (empty($message)) {
     exit;
 }
 
-// ✅ Fixed: Correct path with .json extension
-$serviceAccount = '../../secure/barangaylink-c5e86-firebase-adminsdk-fbsvc-faac69ae05.json';
+// Same resolution logic as functions.php — env var first (Render), falls
+// back to local secure/ folder for local/XAMPP development.
+$serviceAccount = getFirebaseServiceAccount();
 
-// Check if file exists
-if (!file_exists($serviceAccount)) {
-    echo json_encode(['error' => 'Service account file not found: ' . $serviceAccount]);
+if ($serviceAccount === null) {
+    echo json_encode(['error' => 'Firebase service account not available (no env var or local file)']);
     exit;
 }
 
@@ -86,13 +87,13 @@ while ($row = $result->fetch_assoc()) {
         
     } catch (Kreait\Firebase\Exception\Messaging\InvalidMessage $e) {
         // Invalid token - remove it
-        $db->query("DELETE FROM user_devices WHERE fcm_token = '$token'");
+        $db->query("DELETE FROM user_devices WHERE fcm_token = '" . $db->escape($token) . "'");
         $failedTokens[] = $token;
         error_log("Invalid FCM token removed: " . $e->getMessage());
         
     } catch (Kreait\Firebase\Exception\Messaging\NotFound $e) {
         // Token not found - remove it
-        $db->query("DELETE FROM user_devices WHERE fcm_token = '$token'");
+        $db->query("DELETE FROM user_devices WHERE fcm_token = '" . $db->escape($token) . "'");
         $failedTokens[] = $token;
         error_log("FCM token not found: " . $e->getMessage());
         
