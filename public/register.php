@@ -26,23 +26,28 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     }
     
     if (empty($error)) {
-        $data = [
-            'username' => $_POST['username'] ?? '',
-            'email' => $_POST['email'] ?? '',
-            'password' => $_POST['password'] ?? '',
-            'full_name' => $_POST['full_name'] ?? '',
-            'address' => $_POST['address'] ?? '',
-            'contact_number' => $_POST['contact_number'] ?? '',
-            'user_type' => $user_type
-        ];
-        
-        $result = $auth->register($data);
-        
-        if ($result === true) {
-            $message = "Registration successful! You can now login.";
-            echo "<script>setTimeout(function() { window.location.href = 'index.php'; }, 2000);</script>";
+        // Validate confirm password
+        if ($_POST['password'] !== $_POST['confirm_password']) {
+            $error = "Passwords do not match!";
         } else {
-            $error = $result;
+            $data = [
+                'username' => $_POST['username'] ?? '',
+                'email' => $_POST['email'] ?? '',
+                'password' => $_POST['password'] ?? '',
+                'full_name' => $_POST['full_name'] ?? '',
+                'address' => $_POST['address'] ?? '',
+                'contact_number' => $_POST['contact_number'] ?? '',
+                'user_type' => $user_type
+            ];
+
+            $result = $auth->register($data);
+
+            if ($result === true) {
+                $message = "Registration successful! You can now login.";
+                echo "<script>setTimeout(function() { window.location.href = 'index.php'; }, 2000);</script>";
+            } else {
+                $error = $result;
+            }
         }
     }
 }
@@ -442,11 +447,17 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         <div class="input-wrapper">
                             <span class="input-icon">📱</span>
                             <input type="text" name="contact_number" id="contact_number" class="form-control" 
-                                   placeholder="09123456789">
+                                   >
                         </div>
                     </div>
                 </div>
                 
+                <div class="form-group">
+                    <label>Permanent Address</label>
+                    <textarea name="address" id="address" class="form-control" rows="3" 
+                              ></textarea>
+                </div>
+
                 <div class="form-group">
                     <label>Password *</label>
                     <div class="password-wrapper">
@@ -456,13 +467,17 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     </div>
                     <!-- Password strength indicator will be added here by main.js -->
                 </div>
-                
+
                 <div class="form-group">
-                    <label>Address</label>
-                    <textarea name="address" id="address" class="form-control" rows="3" 
-                              placeholder="123 Rizal St., Barangay San Jose"></textarea>
+                    <label>Confirm Password *</label>
+                    <div class="password-wrapper">
+                        <span class="input-icon">🔒</span>
+                        <input type="password" name="confirm_password" id="confirm_password" class="form-control" required>
+                        <span class="toggle-password" onclick="togglePasswordVisibility()" role="button" aria-label="Toggle confirm password visibility">👁️</span>
+                    </div>
                 </div>
-                
+
+
                 <div class="terms">
                     <input type="checkbox" name="terms" id="terms" required>
                     <label for="terms">I agree to the <a href="#" onclick="alert('Terms of Service')">Terms</a> and <a href="#" onclick="alert('Privacy Policy')">Privacy Policy</a></label>
@@ -483,15 +498,15 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     <script>
         // Password visibility toggle
         function togglePasswordVisibility() {
-            const passwordInput = document.getElementById('password');
-            const toggleIcon = document.querySelector('.toggle-password');
-            
-            if (passwordInput.type === 'password') {
-                passwordInput.type = 'text';
-                toggleIcon.textContent = '🔒';
+            const wrapper = this.closest('.password-wrapper');
+            if (!wrapper) return;
+            const input = wrapper.querySelector('input[type="password"]');
+            if (input.type === 'password') {
+                input.type = 'text';
+                this.textContent = '🔒';
             } else {
-                passwordInput.type = 'password';
-                toggleIcon.textContent = '👁️';
+                input.type = 'password';
+                this.textContent = '👁️';
             }
         }
         
@@ -570,7 +585,18 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 }
                 return false;
             }
-            
+
+            // Check if passwords match
+            const confirmPassword = document.getElementById('confirm_password').value;
+            if (password !== confirmPassword) {
+                if (window.BarangayLink && window.BarangayLink.showNotification) {
+                    window.BarangayLink.showNotification('Passwords do not match', 'error');
+                } else {
+                    alert('Passwords do not match');
+                }
+                return false;
+            }
+
             // Check secret code for non-resident roles
             if (userType !== 'resident') {
                 const secretCode = document.getElementById('secret_code').value.trim();

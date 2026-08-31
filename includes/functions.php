@@ -20,7 +20,11 @@ function getStatusBadge($status) {
         'inactive' => 'secondary'
     ];
     $color = $colors[$status] ?? 'secondary';
-    return "<span class='badge bg-$color'>$status</span>";
+
+    // Format status for display: convert underscores to spaces and capitalize each word
+    $display_status = ucwords(str_replace('_', ' ', $status));
+
+    return "<span class='badge bg-$color'>$display_status</span>";
 }
 
 function timeAgo($timestamp) {

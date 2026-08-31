@@ -226,13 +226,17 @@ function initForms() {
     });
     
     // Password strength indicator - IMPROVED VERSION
-    const passwordFields = document.querySelectorAll('input[type="password"]');
+    // Exclude only the login form's password field (index.php), not register.php's
+    // (both fields share id="password", so we scope by the containing form instead)
+    const loginFormPasswordField = document.querySelector('#loginForm input[type="password"]');
+    const passwordFields = Array.from(document.querySelectorAll('input[type="password"]'))
+        .filter(field => field !== loginFormPasswordField);
     passwordFields.forEach(field => {
         // Check if we already set up this field
         if (field.dataset.passwordInit) return;
         field.dataset.passwordInit = 'true';
         
-        // Create strength indicator container if it doesn't exist
+        // Create strength indicator container if it doesn't exirest
         let indicator = field.closest('.form-group')?.querySelector('.password-strength');
         if (!indicator) {
             indicator = document.createElement('div');

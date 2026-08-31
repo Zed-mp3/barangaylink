@@ -31,6 +31,17 @@ $stats['in_progress_requests'] = $db->query("SELECT COUNT(*) as count FROM servi
 $stats['completed_requests'] = $db->query("SELECT COUNT(*) as count FROM service_requests WHERE status='completed'")->fetch_assoc()['count'];
 $stats['rejected_requests'] = $db->query("SELECT COUNT(*) as count FROM service_requests WHERE status='rejected'")->fetch_assoc()['count'];
 
+// Activity Log - Using user_logs table
+$activity_log = $db->query("
+    SELECT 
+        ul.*, 
+        u.full_name AS user_name 
+    FROM user_logs ul 
+    LEFT JOIN users u ON ul.user_id = u.id 
+    ORDER BY ul.created_at DESC 
+    LIMIT 10
+");
+
 // Requests by type
 $requests_by_type = $db->query("SELECT request_type, COUNT(*) as count FROM service_requests GROUP BY request_type");
 
@@ -373,35 +384,70 @@ while($row = $status_result->fetch_assoc()) {
                     </div>
                 </form>
             </div>
-            
-            <!-- Statistics Cards -->
-            <div class="stats-grid">
-                <div class="stat-card">
-                    <h3>Total Residents</h3>
-                    <div class="stat-number"><?php echo $stats['total_residents']; ?></div>
-                    <small>+<?php echo $stats['new_residents']; ?> this month</small>
+
+            <!-- Activity Log Card -->
+            <div class="card no-print">
+                <div class="card-header">
+                    <h3>📋 Activity Log (Recent Actions)</h3>
                 </div>
-                <div class="stat-card">
-                    <h3>Total Requests</h3>
-                    <div class="stat-number"><?php echo $stats['total_requests']; ?></div>
-                </div>
-                <div class="stat-card">
-                    <h3>Pending</h3>
-                    <div class="stat-number"><?php echo $stats['pending_requests']; ?></div>
-                </div>
-                <div class="stat-card">
-                    <h3>In Progress</h3>
-                    <div class="stat-number"><?php echo $stats['in_progress_requests']; ?></div>
-                </div>
-                <div class="stat-card">
-                    <h3>Completed</h3>
-                    <div class="stat-number"><?php echo $stats['completed_requests']; ?></div>
-                </div>
-                <div class="stat-card">
-                    <h3>Rejected</h3>
-                    <div class="stat-number"><?php echo $stats['rejected_requests']; ?></div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover" id="activityLogTable">
+                            <thead>
+                                <tr>
+                                    <th>Time</th>
+                                    <th>User</th>
+                                    <th>Action</th>
+                                    <th>IP Address</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php if ($activity_log && $activity_log->num_rows > 0): ?>
+                                    <?php while($row = $activity_log->fetch_assoc()): ?>
+                                        <tr>
+                                            <td><?php echo date('M d, Y h:i A', strtotime($row['created_at'])); ?></td>
+                                            <td>
+                                                <?php if ($row['user_id']): ?>
+                                                    <?php echo htmlspecialchars($row['user_name'] ?? 'User #' . $row['user_id']); ?>
+                                                <?php else: ?>
+                                                    <span class="text-muted">System</span>
+                                                <?php endif; ?>
+                                            </td>
+                                            <td>
+                                                <?php 
+                                                $action = $row['action'];
+                                                $action_display = ucfirst(str_replace('_', ' ', $action));
+                                                
+                                                // Determine badge color
+                                                $badge_color = 'secondary';
+                                                if (strpos($action, 'login') !== false) $badge_color = 'success';
+                                                elseif (strpos($action, 'logout') !== false) $badge_color = 'danger';
+                                                elseif (strpos($action, 'register') !== false) $badge_color = 'info';
+                                                elseif (strpos($action, 'request') !== false) $badge_color = 'warning';
+                                                ?>
+                                                <span class="badge bg-<?php echo $badge_color; ?>">
+                                                    <?php echo htmlspecialchars($action_display); ?>
+                                                </span>
+                                            </td>
+                                            <td>
+                                                <code><?php echo htmlspecialchars($row['ip_address'] ?? 'N/A'); ?></code>
+                                            </td>
+                                        </tr>
+                                    <?php endwhile; ?>
+                                <?php else: ?>
+                                    <tr>
+                                        <td colspan="4" class="text-center text-muted">
+                                            <em>No recent activity found</em>
+                                        </td>
+                                    </tr>
+                                <?php endif; ?>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
+            
+           
             
             <!-- Charts Section -->
             <div class="row">

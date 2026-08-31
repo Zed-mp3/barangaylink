@@ -573,7 +573,7 @@ $recent_requests = $db->query("SELECT sr.*, u.full_name, u.email
         <div class="container">
             <!-- Dashboard header with new badge -->
             <div class="dashboard-header">
-                <h1>Admin Dashboard</h1>
+                
                 <span id="newCount" class="new-badge" style="display: none;" onclick="refreshDashboard()">✨ 0 new</span>
             </div>
             
@@ -604,27 +604,7 @@ $recent_requests = $db->query("SELECT sr.*, u.full_name, u.email
                 <p>Here's what's happening in your barangay today.</p>
             </div>
             
-            <!-- Quick Actions -->
-            <div class="quick-actions">
-                <a href="announcements.php?action=add" class="quick-action-btn" data-tooltip="Create new announcement">
-                    <span class="icon">📢</span>
-                    <span>New Announcement</span>
-                </a>
-                <a href="service_requests.php?filter=pending" class="quick-action-btn" data-tooltip="View pending requests">
-                    <span class="icon">⏳</span>
-                    <span>Pending Requests</span>
-                </a>
-                <a href="residents.php?action=add" class="quick-action-btn" data-tooltip="Register new resident">
-                    <span class="icon">👤</span>
-                    <span>Add Resident</span>
-                </a>
-                <a href="reports.php" class="quick-action-btn" data-tooltip="Generate reports">
-                    <span class="icon">📊</span>
-                    <span>Generate Report</span>
-                </a>
-            </div>
-            
-            <!-- Statistics -->
+             <!-- Statistics -->
             <div class="stats-grid">
                 <div class="stat-card" data-tooltip="Total registered residents">
                     <h3>Total Residents</h3>
@@ -647,6 +627,28 @@ $recent_requests = $db->query("SELECT sr.*, u.full_name, u.email
                     <div class="stat-icon">📢</div>
                 </div>
             </div>
+
+            <!-- Quick Actions -->
+            <div class="quick-actions">
+                <a href="announcements.php?action=add" class="quick-action-btn" data-tooltip="Create new announcement">
+                    <span class="icon">📢</span>
+                    <span>New Announcement</span>
+                </a>
+                <a href="service_requests.php?filter=pending" class="quick-action-btn" data-tooltip="View pending requests">
+                    <span class="icon">⏳</span>
+                    <span>Pending Requests</span>
+                </a>
+                <a href="residents.php?action=add" class="quick-action-btn" data-tooltip="Register new resident">
+                    <span class="icon">👤</span>
+                    <span>Add Resident</span>
+                </a>
+                <a href="reports.php" class="quick-action-btn" data-tooltip="Generate reports">
+                    <span class="icon">📊</span>
+                    <span>Generate Report</span>
+                </a>
+            </div>
+            
+           
             
             <div class="row">
                 <div class="col">
