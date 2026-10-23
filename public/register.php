@@ -28,7 +28,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     if (empty($error)) {
         // Validate confirm password
         if ($_POST['password'] !== $_POST['confirm_password']) {
-            $error = "Passwords do not match!";
+            $error = "password not match";
         } else {
             $data = [
                 'username' => $_POST['username'] ?? '',
@@ -454,7 +454,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 
                 <div class="form-group">
                     <label>Permanent Address</label>
-                    <textarea name="address" id="address" class="form-control" rows="3" 
+                    <textarea name="address" id="address" class="form-control" rows="3" style="resize: none;"
                               ></textarea>
                 </div>
 
@@ -463,7 +463,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     <div class="password-wrapper">
                         <span class="input-icon">🔒</span>
                         <input type="password" name="password" id="password" class="form-control" required>
-                        <span class="toggle-password" onclick="togglePasswordVisibility()" role="button" aria-label="Toggle password visibility">👁️</span>
+                        <span class="toggle-password" onclick="togglePasswordVisibility(this)" role="button" aria-label="Toggle password visibility">👁️</span>
                     </div>
                     <!-- Password strength indicator will be added here by main.js -->
                 </div>
@@ -473,7 +473,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     <div class="password-wrapper">
                         <span class="input-icon">🔒</span>
                         <input type="password" name="confirm_password" id="confirm_password" class="form-control" required>
-                        <span class="toggle-password" onclick="togglePasswordVisibility()" role="button" aria-label="Toggle confirm password visibility">👁️</span>
+                        <span class="toggle-password" onclick="togglePasswordVisibility(this)" role="button" aria-label="Toggle confirm password visibility">👁️</span>
                     </div>
                 </div>
 
@@ -497,17 +497,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     
     <script>
         // Password visibility toggle
-        function togglePasswordVisibility() {
-            const wrapper = this.closest('.password-wrapper');
-            if (!wrapper) return;
-            const input = wrapper.querySelector('input[type="password"]');
-            if (input.type === 'password') {
-                input.type = 'text';
-                this.textContent = '🔒';
-            } else {
-                input.type = 'password';
-                this.textContent = '👁️';
-            }
+        function togglePasswordVisibility(element) {
+            const input = element.previousElementSibling;
+            if (!input) return;
+            input.type = input.type === 'password' ? 'text' : 'password';
+            element.textContent = input.type === 'password' ? '👁️' : '🔒';
         }
         
         // Role selection
@@ -590,9 +584,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             const confirmPassword = document.getElementById('confirm_password').value;
             if (password !== confirmPassword) {
                 if (window.BarangayLink && window.BarangayLink.showNotification) {
-                    window.BarangayLink.showNotification('Passwords do not match', 'error');
+                    window.BarangayLink.showNotification('password not match', 'error');
                 } else {
-                    alert('Passwords do not match');
+                    alert('password not match');
                 }
                 return false;
             }

@@ -38,6 +38,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>BarangayLink - Login</title>
     <link rel="stylesheet" href="../src/css/main.css">
+    <script type="module" src="../src/js/main.js"></script>
     <style>
         
         
@@ -368,6 +369,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     });
     </script>
     
-    <script type="module" src="../src/js/main.js"></script>
+    
 </body>
 </html>

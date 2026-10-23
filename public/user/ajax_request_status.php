@@ -55,6 +55,7 @@ $requests = $db->query("SELECT * FROM service_requests $where_clause ORDER BY cr
                                 <div class="card-body">
                                     <h4>Request Details</h4>
                                     <p><strong>Description:</strong> <?php echo nl2br(htmlspecialchars($row['description'])); ?></p>
+                                    <p><strong>Fee:</strong> &#8369;<?php echo number_format($row['fee'], 2); ?></p>
                                     <p><strong>Submitted:</strong> <?php echo date('F d, Y h:i A', strtotime($row['created_at'])); ?></p>
                                     <?php if ($row['updated_at'] != $row['created_at']): ?>
                                         <p><strong>Last Updated:</strong> <?php echo date('F d, Y h:i A', strtotime($row['updated_at'])); ?></p>

@@ -16,10 +16,19 @@ $error = '';
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $request_type = $db->escape($_POST['request_type']);
     $description = $db->escape($_POST['description']);
-    
-    $sql = "INSERT INTO service_requests (user_id, request_type, description) 
-            VALUES ({$user['id']}, '$request_type', '$description')";
-    
+
+    // Calculate fee based on request type
+    $fees = [
+        "Barangay Clearance" => 50.00,
+        "Certificate of Residency" => 50.00,
+        "Business Permit" => 100.00,
+        // Other request types have no fee (default 0.00)
+    ];
+    $fee = $fees[$request_type] ?? 0.00;
+
+    $sql = "INSERT INTO service_requests (user_id, request_type, description, fee)
+            VALUES ({$user['id']}, '$request_type', '$description', {$fee})";
+
     if ($db->query($sql)) {
         $message = "Service request submitted successfully!";
     } else {

@@ -226,11 +226,14 @@ function initForms() {
     });
     
     // Password strength indicator - IMPROVED VERSION
-    // Exclude only the login form's password field (index.php), not register.php's
+    // Exclude the login form's password field (index.php), and exclude any
+    // "confirm password" field - those get a real-time match check instead
     // (both fields share id="password", so we scope by the containing form instead)
-    const loginFormPasswordField = document.querySelector('#loginForm input[type="password"]');
+        const loginFormPasswordField = document.querySelector('#loginForm input[type="password"]');
     const passwordFields = Array.from(document.querySelectorAll('input[type="password"]'))
-        .filter(field => field !== loginFormPasswordField);
+        .filter(field => field !== loginFormPasswordField)
+        .filter(field => !/confirm/i.test(field.id) && !/confirm/i.test(field.name || ''))
+        .filter(field => !/secret/i.test(field.id) && !/secret/i.test(field.name || ''));
     passwordFields.forEach(field => {
         // Check if we already set up this field
         if (field.dataset.passwordInit) return;
@@ -268,6 +271,75 @@ function initForms() {
             updatePasswordStrength(field);
         }
     });
+
+    // Real-time "passwords match" check for any confirm-password field
+    initConfirmPasswordMatch();
+}
+
+// Real-time confirm-password match indicator
+function initConfirmPasswordMatch() {
+    const confirmFields = document.querySelectorAll('input[type="password"][id*="confirm" i], input[type="password"][name*="confirm" i]');
+
+    confirmFields.forEach(confirmField => {
+        if (confirmField.dataset.matchInit) return;
+        confirmField.dataset.matchInit = 'true';
+
+        const form = confirmField.closest('form');
+        if (!form) return;
+
+        // Prefer the canonical password field by id/name, fall back to first
+        // password input that is not the confirm field and not a secret code field
+        let passwordField = form.querySelector('input[type="password"]#password')
+                         || form.querySelector('input[type="password"][name="password"]');
+
+        if (!passwordField) {
+            passwordField = form.querySelector(
+                'input[type="password"]:not([id*="confirm" i]):not([name*="confirm" i]):not([id*="secret" i]):not([name*="secret" i])'
+            );
+        }
+
+        if (!passwordField || passwordField === confirmField) return;
+
+        const formGroup = confirmField.closest('.form-group');
+        let indicator = formGroup ? formGroup.querySelector('.password-match') : null;
+        if (!indicator && formGroup) {
+            indicator = document.createElement('div');
+            indicator.className = 'password-match';
+            indicator.style.display = 'none';
+            formGroup.appendChild(indicator);
+        }
+        if (!indicator) return;
+
+        const updateMatch = () => updatePasswordMatch(passwordField, confirmField, indicator);
+
+        confirmField.addEventListener('input', updateMatch);
+        passwordField.addEventListener('input', updateMatch);
+
+        if (confirmField.value !== '') {
+            updateMatch();
+        }
+    });
+}
+
+function updatePasswordMatch(passwordField, confirmField, indicator) {
+    const confirmValue = confirmField.value;
+
+    if (confirmValue === '') {
+        indicator.style.display = 'none';
+        indicator.textContent = '';
+        indicator.className = 'password-match';
+        return;
+    }
+
+    indicator.style.display = 'block';
+
+    if (confirmValue === passwordField.value) {
+        indicator.className = 'password-match match';
+        indicator.textContent = '✓ Passwords match';
+    } else {
+        indicator.className = 'password-match no-match';
+        indicator.textContent = '✗ Passwords do not match';
+    }
 }
 
 // Separate function to update password strength

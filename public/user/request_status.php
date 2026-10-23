@@ -280,15 +280,16 @@ $user_name = $user['full_name'];
                                             <td><?php echo date('M d, Y', strtotime($row['created_at'])); ?></td>
                                             <td><?php echo $row['updated_at'] != $row['created_at'] ? timeAgo($row['updated_at']) : 'Not updated'; ?></td>
                                             <td>
-                                                <button onclick="toggleDetails(<?php echo $row['id']; ?>)" class="btn btn-primary btn-sm" data-tooltip="View details">👁️ View</button>
+                                                <button onclick="showRequestDetails(<?php echo $row['id']; ?>)" class="btn btn-primary btn-sm" data-tooltip="View details">👁️ View</button>
                                             </td>
                                         </tr>
-                                        <tr id="details-<?php echo $row['id']; ?>" class="hidden details-row">
+                                        <tr id="details-<?php echo $row['id']; ?>" class="hidden details-row" style="display: none;">
                                             <td colspan="5">
                                                 <div class="card" style="margin: 10px 0;">
                                                     <div class="card-body">
                                                         <h4>Request Details</h4>
                                                         <p><strong>Description:</strong> <?php echo nl2br(htmlspecialchars($row['description'])); ?></p>
+                                                        <p><strong>Fee:</strong> &#8369;<?php echo number_format($row['fee'], 2); ?></p>
                                                         <p><strong>Submitted:</strong> <?php echo date('F d, Y h:i A', strtotime($row['created_at'])); ?></p>
                                                         <?php if ($row['updated_at'] != $row['created_at']): ?>
                                                             <p><strong>Last Updated:</strong> <?php echo date('F d, Y h:i A', strtotime($row['updated_at'])); ?></p>
@@ -335,7 +336,20 @@ $user_name = $user['full_name'];
             </div>
         </div>
     </div>
-    
+
+    <!-- Request Details Modal -->
+    <div class="modal" id="requestDetailsModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Request Details</h3>
+                <button type="button" class="modal-close" data-modal-close aria-label="Close">&times;</button>
+            </div>
+            <div class="modal-body" id="requestDetailsModalBody">
+                <!-- Populated from the matching details-<id> row on click -->
+            </div>
+        </div>
+    </div>
+
         <script>
     // Initialize push notifications
     import('../../src/js/push-notification-service.js').then(module => {
@@ -545,9 +559,20 @@ $user_name = $user['full_name'];
             });
     }
 
-    function toggleDetails(id) {
-        const detailsRow = document.getElementById('details-' + id);
-        detailsRow.classList.toggle('hidden');
+    function showRequestDetails(id) {
+        const source = document.getElementById('details-' + id);
+        const modalBody = document.getElementById('requestDetailsModalBody');
+        if (!source || !modalBody) return;
+
+        // Reuse the server-rendered details markup as the modal content
+        modalBody.innerHTML = source.querySelector('td').innerHTML;
+
+        if (typeof openModal === 'function') {
+            openModal('requestDetailsModal');
+        } else {
+            document.getElementById('requestDetailsModal').classList.add('show');
+            document.body.style.overflow = 'hidden';
+        }
     }
 
     function sortTable(colIndex) {
@@ -584,12 +609,12 @@ $user_name = $user['full_name'];
     }
 
     function reattachEventListeners() {
-        // Re-attach toggle details listeners
-        document.querySelectorAll('button[onclick^="toggleDetails"]').forEach(button => {
+        // Re-attach "View" button listeners (opens the details modal)
+        document.querySelectorAll('button[onclick^="showRequestDetails"]').forEach(button => {
             const match = button.getAttribute('onclick').match(/\d+/);
             if (match) {
                 const id = match[0];
-                button.onclick = function() { toggleDetails(id); };
+                button.onclick = function() { showRequestDetails(id); };
             }
         });
         
@@ -628,3 +653,4 @@ $user_name = $user['full_name'];
     <script src="../../src/js/pull-to-refresh.js"></script>
 </body>
 </html>
+

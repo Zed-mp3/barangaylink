@@ -1,0 +1,14 @@
+﻿*** Begin Patch
+*** Update File: C:\xampp\htdocs\barangaylink\public\user\request_status.php
+@@ -290,2 +290,3 @@
+                                                        <h4>Request Details</h4>
+                                                        <p><strong>Description:</strong> <?php echo nl2br(htmlspecialchars(['description'])); ?></p>
++                                                        <p><strong>Fee:</strong> &#8369;<?php echo number_format(['fee'], 2); ?></p>
+                                                        <p><strong>Submitted:</strong> <?php echo date('F d, Y h:i A', strtotime(['created_at'])); ?></p>
+*** Update File: C:\xampp\htdocs\barangaylink\public\user\ajax_request_status.php
+@@ -55,2 +55,3 @@
+                                    <h4>Request Details</h4>
+                                    <p><strong>Description:</strong> <?php echo nl2br(htmlspecialchars(['description'])); ?></p>
++                                    <p><strong>Fee:</strong> &#8369;<?php echo number_format(['fee'], 2); ?></p>
+                                    <p><strong>Submitted:</strong> <?php echo date('F d, Y h:i A', strtotime(['created_at'])); ?></p>
+*** End Patch

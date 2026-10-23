@@ -47,6 +47,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_status'])) {
     $status = $db->escape($_POST['status']);
     $reason = isset($_POST['reason']) ? $db->escape($_POST['reason']) : '';
     $notes = isset($_POST['notes']) ? $db->escape($_POST['notes']) : '';
+    $fee = isset($_POST['fee']) ? (float)$_POST['fee'] : 0.00;
 
     // Block updates on requests that are already completed or rejected —
     // those are final states and shouldn't be editable again.
@@ -58,7 +59,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_status'])) {
     }
     
     // Build update query
-    $updates = ["status='$status'", "updated_at=NOW()"];
+    $updates = ["status='$status'", "fee=$fee", "updated_at=NOW()"];
     
     // Add reason if status is rejected or completed with notes
     if ($status == 'rejected' && !empty($reason)) {
@@ -511,6 +512,12 @@ $requests = $db->query($sql);
                                                                 <option value="rejected" <?php echo $row['status'] == 'rejected' ? 'selected' : ''; ?>>❌ Rejected</option>
                                                             </select>
                                                         </div>
+
+                                                        <!-- Fee Field -->
+                                                        <div class="form-group">
+                                                            <label>Fee (₱)</label>
+                                                            <input type="number" name="fee" id="fee-<?php echo $row['id']; ?>" class="form-control" min="0" step="0.01" value="<?php echo number_format($row['fee'], 2); ?>" required>
+                                                        </div>
                                                         
                                                         <!-- Reason for Rejection Field -->
                                                         <div class="reason-field" id="reason-<?php echo $row['id']; ?>">
@@ -636,7 +643,8 @@ $requests = $db->query($sql);
         const statusSelect = document.getElementById('status-' + id);
         const reasonField = document.getElementById('reason-' + id);
         const reasonTextarea = reasonField.querySelector('textarea');
-        
+        const feeInput = document.getElementById('fee-' + id);
+
         if (statusSelect.value === 'rejected') {
             if (!reasonTextarea.value.trim()) {
                 // Use the same notification system for validation errors
@@ -648,6 +656,20 @@ $requests = $db->query($sql);
                 return false;
             }
         }
+
+        // Validate fee is a valid number
+        if (feeInput) {
+            const feeValue = parseFloat(feeInput.value);
+            if (isNaN(feeValue) || feeValue < 0) {
+                if (window.BarangayLink && window.BarangayLink.showNotification) {
+                    window.BarangayLink.showNotification('Please enter a valid fee amount', 'error');
+                } else {
+                    alert('Please enter a valid fee amount');
+                }
+                return false;
+            }
+        }
+
         return true;
     }
     </script>

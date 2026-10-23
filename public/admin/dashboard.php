@@ -714,23 +714,7 @@ $recent_requests = $db->query("SELECT sr.*, u.full_name, u.email
                 </div>
             </div>
             
-            <div class="row">
-                <div class="col">
-                    <div class="card">
-                        <div class="card-header">
-                            <h3>System Overview</h3>
-                        </div>
-                        <div class="card-body system-info" id="systemInfo">
-                            <p><strong>Administrator:</strong> <?php echo htmlspecialchars($user['full_name']); ?></p>
-                            <p><strong>Email:</strong> <?php echo htmlspecialchars($user['email']); ?></p>
-                            <p><strong>Last Login:</strong> <?php echo isset($_SESSION['last_login']) ? date('F d, Y h:i A', $_SESSION['last_login']) : 'First login'; ?></p>
-                            <p><strong>System Version:</strong> 1.0.0</p>
-                            <p><strong>PHP Version:</strong> <?php echo phpversion(); ?></p>
-                            <p><strong>Database:</strong> MySQL</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
+            
         </div>
     </div>
     <script src="../../src/js/admin-dashboard.js"></script>
