@@ -3,6 +3,13 @@ require_once 'database.php';
 
 class Auth {
     private $db;
+
+    /** Set by login() when it fails: 'unverified' if the password was right but the email isn't verified. */
+    public $loginError = null;
+    /** Email of the account that failed login because it is unverified (for the "resend" link). */
+    public $unverifiedEmail = null;
+    /** ID of the account created by the last successful register() call. */
+    public $lastRegisteredId = null;
     
     public function __construct() {
         $this->db = new Database();
@@ -18,6 +25,13 @@ class Auth {
         if ($result->num_rows == 1) {
             $user = $result->fetch_assoc();
             if (password_verify($password, $user['password'])) {
+                // Block login until the email address has been verified
+                if (array_key_exists('email_verified', $user) && !(int)$user['email_verified']) {
+                    $this->loginError = 'unverified';
+                    $this->unverifiedEmail = $user['email'];
+                    return false;
+                }
+
                 // Clear any existing session data
                 $_SESSION = array();
                 
@@ -126,10 +140,17 @@ class Auth {
     $user_type = $this->db->escape($data['user_type'] ?? 'resident');
     
     // Check if username or email already exists
-    $check_sql = "SELECT id FROM users WHERE username = '$username' OR email = '$email'";
+    $check_sql = "SELECT id, email, email_verified FROM users WHERE username = '$username' OR email = '$email'";
     $check_result = $this->db->query($check_sql);
     
     if ($check_result && $check_result->num_rows > 0) {
+        $existing = $check_result->fetch_assoc();
+        // Same email already registered but never verified: point them to the resend page
+        if (isset($existing['email_verified']) && !(int)$existing['email_verified']
+            && strcasecmp($existing['email'], $data['email']) === 0) {
+            return "This email is already registered but not verified yet. "
+                 . "<a href=\"resend_verification.php?email=" . urlencode($data['email']) . "\">Resend the verification email</a>.";
+        }
         return "Username or email already exists!";
     }
     
@@ -146,12 +167,14 @@ class Auth {
     // Set default status based on user type
     $status = 'active';
     
-    $sql = "INSERT INTO users (username, email, password, full_name, address, contact_number, user_type, status, created_at) 
-            VALUES ('$username', '$email', '$password', '$full_name', '$address', '$contact', '$user_type', '$status', NOW())";
+    // New accounts start unverified (email_verified = 0) until they click the emailed link
+    $sql = "INSERT INTO users (username, email, email_verified, password, full_name, address, contact_number, user_type, status, created_at) 
+            VALUES ('$username', '$email', 0, '$password', '$full_name', '$address', '$contact', '$user_type', '$status', NOW())";
     
     if ($this->db->query($sql)) {
         // Use lastInsertId() instead of insert_id()
         $user_id = $this->db->lastInsertId();
+        $this->lastRegisteredId = $user_id;
         
         // Log the registration
         $this->logActivity($user_id, 'register');
