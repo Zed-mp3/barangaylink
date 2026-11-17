@@ -30,8 +30,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 echo "<script>sessionStorage.setItem('notification', JSON.stringify({message: 'Username or email already exists!', type: 'error'}));</script>";
             } else {
                 $password = password_hash('default123', PASSWORD_DEFAULT); // Default password
-                $sql = "INSERT INTO users (username, email, password, full_name, address, contact_number, user_type, status) 
-                        VALUES ('$username', '$email', '$password', '$full_name', '$address', '$contact_number', 'resident', 'active')";
+                // Admin-created accounts are trusted, so they skip email verification
+                $sql = "INSERT INTO users (username, email, email_verified, email_verified_at, password, full_name, address, contact_number, user_type, status) 
+                        VALUES ('$username', '$email', 1, NOW(), '$password', '$full_name', '$address', '$contact_number', 'resident', 'active')";
                 
                 if ($db->query($sql)) {
                     echo "<script>sessionStorage.setItem('notification', JSON.stringify({message: 'Resident added successfully! Default password: default123', type: 'success'}));</script>";
