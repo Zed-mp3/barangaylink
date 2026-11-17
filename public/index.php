@@ -5,6 +5,11 @@ require_once '../includes/auth.php';
 
 $auth = new Auth();
 $error = '';
+$success = '';
+
+if (isset($_GET['reset'])) {
+    $success = 'Your password has been reset. You can now log in with your new password.';
+}
 
 // If already logged in, redirect to dashboard
 if ($auth->isLoggedIn()) {
@@ -26,6 +31,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         } else {
             redirect('user/dashboard.php');
         }
+    } elseif ($auth->loginError === 'unverified') {
+        $error = 'Please verify your email address before logging in. '
+               . '<a href="resend_verification.php?email=' . urlencode($auth->unverifiedEmail) . '" class="btn-link">Resend verification email</a>';
     } else {
         $error = "Invalid username or password";
     }
@@ -205,6 +213,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             border: 1px solid #fcc;
         }
         
+        .alert-success {
+            animation: none;
+        }
+        
         @keyframes slideUp {
             from {
                 opacity: 0;
@@ -279,6 +291,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             <h2>Welcome to BarangayLink</h2>
             <p>Please login to continue</p>
             
+            <?php if ($success): ?>
+                <div class="alert alert-success"><?php echo $success; ?></div>
+            <?php endif; ?>
+            
             <?php if ($error): ?>
                 <div class="alert alert-danger"><?php echo $error; ?></div>
             <?php endif; ?>
@@ -307,6 +323,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 <div class="remember-me">
                     <input type="checkbox" name="remember" id="remember" <?php echo isset($_POST['remember']) ? 'checked' : ''; ?>>
                     <label for="remember">Remember me for 30 days</label>
+                    <a href="forgot_password.php" class="btn-link" style="margin-left:auto; font-size:0.9rem;">Forgot password?</a>
                 </div>
                 
                 <button type="submit" class="btn-primary" id="loginBtn">Login</button>
