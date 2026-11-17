@@ -2,6 +2,7 @@
 require_once '../includes/config.php';
 require_once '../includes/functions.php';
 require_once '../includes/auth.php';
+require_once '../includes/account_tokens.php';
 
 $auth = new Auth();
 $message = '';
@@ -43,8 +44,19 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $result = $auth->register($data);
 
             if ($result === true) {
-                $message = "Registration successful! You can now login.";
-                echo "<script>setTimeout(function() { window.location.href = 'index.php'; }, 2000);</script>";
+                // Email the verification link (account can't log in until it's clicked)
+                $tokens = new AccountTokens();
+                [$sentOk, $sendErr] = $tokens->sendVerification((int)$auth->lastRegisteredId, $data['email'], $data['full_name']);
+
+                if ($sentOk) {
+                    $message = "Registration successful! We sent a verification link to <strong>"
+                             . htmlspecialchars($data['email']) . "</strong>. "
+                             . "Please verify your email before logging in (check your spam folder too).";
+                } else {
+                    error_log("Registration: verification email failed for user #{$auth->lastRegisteredId}: $sendErr");
+                    $message = "Your account was created, but we couldn't send the verification email right now. "
+                             . "<a href=\"resend_verification.php?email=" . urlencode($data['email']) . "\">Resend the verification email</a>.";
+                }
             } else {
                 $error = $result;
             }
@@ -384,7 +396,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 <div class="alert alert-danger"><?php echo $error; ?></div>
             <?php endif; ?>
             
-            <form method="POST" action="" id="registerForm" onsubmit="return validateForm()">
+            <form method="POST" action="" id="registerForm" onsubmit="return validateForm()" <?php echo $message ? 'style="display:none"' : ''; ?>>
                 <!-- Role Selection -->
                 <div class="role-selector">
                     <div class="role-card" data-role="resident" onclick="selectRole('resident')">
